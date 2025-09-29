@@ -5,7 +5,7 @@ let package = Package(
     name: "LaserDetector",
     platforms: [
         .iOS(.v15),
-        .macOS(.v10_15)
+        .macOS(.v11)
     ],
     products: [
         // Продукт, який можна запускати

@@ -1,4 +1,4 @@
-name: Xcode - Build and Analyze
+name: Xcode Build & Analyze
 
 on:
   push:
@@ -8,45 +8,53 @@ on:
 
 jobs:
   build:
-    name: Build and analyse default scheme using xcodebuild command
+    name: Build & Analyze SwiftUI Project
     runs-on: macos-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set Default Scheme
+      - name: Find scheme automatically
+        id: scheme
         run: |
-          # Отримуємо список схем і таргетів
-          scheme_list=$(xcodebuild -list -json | tr -d "\n")
-          
-          # Ruby-скрипт для отримання першого scheme/target
-          default=$(echo $scheme_list | ruby -e "
+          SCHEME=""
+          # Перевірка на workspace
+          if [ "$(ls -A | grep -i '\.xcworkspace$')" ]; then
+            WORKSPACE=$(ls -A | grep -i '\.xcworkspace$')
+            SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list -json | ruby -e "
 require 'json'
 data = JSON.parse(STDIN.gets)
-if data['project']
-  puts data['project']['targets'][0]
-elsif data['workspace']
-  puts data['workspace']['schemes'][0]
-else
-  abort('No scheme or target found')
-end
+puts data['workspace']['schemes'][0]
 ")
-          echo $default | cat > default
-          echo Using default scheme: $default
-
-      - name: Build
-        env:
-          scheme: ${{ 'default' }}
-        run: |
-          if [ $scheme = default ]; then scheme=$(cat default); fi
-          # Визначаємо project або workspace
-          if [ "`ls -A | grep -i \\.xcworkspace\$`" ]; then
-            filetype_parameter="workspace"
-            file_to_build="`ls -A | grep -i \\.xcworkspace\$`"
+          # Інакше project
+          elif [ "$(ls -A | grep -i '\.xcodeproj$')" ]; then
+            PROJECT=$(ls -A | grep -i '\.xcodeproj$')
+            SCHEME=$(xcodebuild -project "$PROJECT" -list -json | ruby -e "
+require 'json'
+data = JSON.parse(STDIN.gets)
+puts data['project']['targets'][0]
+")
           else
-            filetype_parameter="project"
-            file_to_build="`ls -A | grep -i \\.xcodeproj\$`"
+            echo "No workspace or project found" && exit 1
           fi
-          file_to_build=`echo $file_to_build | awk '{$1=$1;print}'`
-          xcodebuild clean build analyze -scheme "$scheme" -"$filetype_parameter" "$file_to_build" | xcpretty && exit ${PIPESTATUS[0]}
+          echo "scheme=$SCHEME" >> $GITHUB_ENV
+          echo "Using scheme: $SCHEME"
+
+      - name: Build & Analyze
+        run: |
+          # Визначаємо файл для збірки
+          if [ "$(ls -A | grep -i '\.xcworkspace$')" ]; then
+            FILE_TO_BUILD=$(ls -A | grep -i '\.xcworkspace$')
+            FILE_TYPE="workspace"
+          else
+            FILE_TO_BUILD=$(ls -A | grep -i '\.xcodeproj$')
+            FILE_TYPE="project"
+          fi
+          FILE_TO_BUILD=$(echo $FILE_TO_BUILD | awk '{$1=$1;print}')
+
+          # Збираємо проект під macOS 11+ для SwiftUI
+          xcodebuild clean build analyze \
+            -"$FILE_TYPE" "$FILE_TO_BUILD" \
+            -scheme "$scheme" \
+            MACOSX_DEPLOYMENT_TARGET=11.0 | xcpretty && exit ${PIPESTATUS[0]}

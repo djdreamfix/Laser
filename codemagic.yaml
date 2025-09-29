@@ -1,42 +1,34 @@
 workflows:
   ios-laser-detector:
-    name: LaserDetector iOS Build
+    name: LaserDetector iOS
     max_build_duration: 60
     environment:
       vars:
-        FLUTTER_BUILD_MODE: "release" # лишив для сумісності, можна видалити
+        FLUTTER_BUILD_MODE: "release" # залишено на випадок, якщо буде Flutter, інакше не впливає
     scripts:
       - name: Install dependencies
         script: echo "No dependencies needed for pure SwiftUI project"
-      
-      - name: Determine scheme and team ID
+
+      - name: Set variables
         script: |
+          # Визначаємо файл для збірки
+          if ls *.xcworkspace 1> /dev/null 2>&1; then
+            filetype="workspace"
+            file=$(ls *.xcworkspace | head -1)
+          else
+            filetype="project"
+            file=$(ls *.xcodeproj | head -1)
+          fi
+          echo "Building file: $file ($filetype)"
+
           # Визначаємо схему
-          scheme=$(xcodebuild -list -json | ruby -r json -e "puts JSON.parse(STDIN.read)['project']['schemes'][0]")
+          scheme=$(xcodebuild -list -"$filetype" "$file" -json | ruby -r json -e "puts JSON.parse(STDIN.read)['project']['schemes'][0]")
           echo "Using scheme: $scheme"
 
-          # Визначаємо Team ID із project.pbxproj
-          project_file=$(ls *.xcodeproj | head -1)
-          team_id=$(grep -m1 "DEVELOPMENT_TEAM" "$project_file/project.pbxproj" | awk -F' = ' '{print $2}' | tr -d '";')
+          # Визначаємо Team ID (для автоматичного підпису)
+          team_id=$(grep -m1 "DEVELOPMENT_TEAM" "$file/project.pbxproj" | awk -F' = ' '{print $2}' | tr -d '";')
           echo "Using Team ID: $team_id"
 
-          echo $scheme > scheme.txt
-          echo $team_id > team_id.txt
-
-      - name: Clean & Archive iOS app
-        script: |
-          scheme=$(cat scheme.txt)
-          team_id=$(cat team_id.txt)
-
-          xcodebuild clean archive \
-            -scheme "$scheme" \
-            -sdk iphoneos \
-            -configuration Release \
-            -archivePath build/LaserDetector.xcarchive \
-            -destination "generic/platform=iOS" \
-            -allowProvisioningUpdates \
-            DEVELOPMENT_TEAM="$team_id"
-
-      - name: Export .ipa
-        script: |
-          schem
+          echo "FILE=$file" >> $CM_ENV_FILE
+          echo "FILETYPE=$filetype" >> $CM_ENV_FILE
+          echo "SCHEM

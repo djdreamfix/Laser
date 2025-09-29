@@ -1,4 +1,4 @@
-name: Swift
+name: Swift Package Build
 
 on:
   push:
@@ -8,14 +8,17 @@ on:
 
 jobs:
   build:
-
-    runs-on: macos-14
+    runs-on: macos-latest
 
     steps:
-    - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    # Кешування Swift пакетів та збірки
-    - name: Cache Swift packages
-      uses: actions/cache@v3
-      with:
-        path: |
+      - name: Install Swift dependencies
+        run: swift package resolve
+
+      - name: Build Package
+        run: swift build -v
+
+      - name: Run Tests
+        run: swift test -v

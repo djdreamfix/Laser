@@ -1,4 +1,4 @@
-name: Xcode - Build and Analyze
+name: Xcode Build and Analyze
 
 on:
   push:
@@ -8,43 +8,45 @@ on:
 
 jobs:
   build:
-    name: Build and analyse default scheme using xcodebuild command
     runs-on: macos-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: List files
-        run: ls -la
+      - name: Select Xcode version
+        uses: maxim-lobanov/setup-xcode@v3
+        with:
+          xcode-version: '15' # або потрібна версія
 
-      - name: Set Default Scheme
-        id: set_scheme
+      - name: Find workspace/project
+        id: files
         run: |
-          scheme_list=$(xcodebuild -list -json)
-          default=$(echo "$scheme_list" | ruby -r json -e '
-            data = JSON.parse(STDIN.read)
-            if data["projects"]
-              puts data["projects"].values.first["targets"].first
-            elsif data["workspaces"]
-              puts data["workspaces"].values.first["schemes"].first
-            else
-              abort("Cannot find project or workspace in JSON")
-            end
-          ')
-          echo "Default scheme: $default"
-          echo "DEFAULT_SCHEME=$default" >> $GITHUB_ENV
-
-      - name: Build
-        run: |
-          scheme=$DEFAULT_SCHEME
-          if [ "`ls -A | grep -i \\.xcworkspace\$`" ]; then
-            filetype_parameter="workspace"
-            file_to_build="`ls -A | grep -i \\.xcworkspace\$`"
+          if ls *.xcworkspace 1> /dev/null 2>&1; then
+            echo "filetype=workspace" >> $GITHUB_OUTPUT
+            echo "file_to_build=$(ls *.xcworkspace)" >> $GITHUB_OUTPUT
+          elif ls *.xcodeproj 1> /dev/null 2>&1; then
+            echo "filetype=project" >> $GITHUB_OUTPUT
+            echo "file_to_build=$(ls *.xcodeproj)" >> $GITHUB_OUTPUT
           else
-            filetype_parameter="project"
-            file_to_build="`ls -A | grep -i \\.xcodeproj\$`"
+            echo "No Xcode workspace or project found!" >&2
+            exit 1
           fi
-          file_to_build=`echo $file_to_build | awk '{$1=$1;print}'`
-          echo "Building scheme: $scheme in $file_to_build"
-          xcodebuild clean build analyze -scheme "$scheme" -"$filetype_parameter" "$file_to_build" | xcpretty && exit ${PIPESTATUS[0]}
+
+      - name: Find default scheme
+        id: scheme
+        run: |
+          default_scheme=$(xcodebuild -list -json -"$filetype" "$file_to_build" | jq -r '.project.schemes[0]')
+          if [ -z "$default_scheme" ] || [ "$default_scheme" == "null" ]; then
+            echo "No scheme found!" >&2
+            exit 1
+          fi
+          echo "scheme=$default_scheme" >> $GITHUB_OUTPUT
+
+      - name: Build and Analyze
+        run: |
+          xcodebuild clean build analyze \
+            -"$filetype" "${{ steps.files.outputs.file_to_build }}" \
+            -scheme "${{ steps.scheme.outputs.scheme }}" \
+            -sdk iphonesimulator \
+            -destination 'platform=iOS Simulator,name=iPhone 14,OS=17.0' | xcpretty

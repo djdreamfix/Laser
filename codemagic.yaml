@@ -1,24 +1,26 @@
 workflows:
   ios-laser-detector:
-    name: LaserDetector
+    name: LaserDetector iOS
     max_build_duration: 60
     environment:
       vars:
-        FLUTTER_BUILD_MODE: "release"
+        FLUTTER_BUILD_MODE: "release" # можна прибрати, якщо чистий SwiftUI
     scripts:
       - name: Install dependencies
         script: echo "No dependencies needed for pure SwiftUI project"
-      - name: Build iOS app
+      - name: Build and archive iOS app
         script: |
+          # Архівуємо додаток
           xcodebuild clean archive \
             -scheme LaserDetector \
             -sdk iphoneos \
             -configuration Release \
-            -destination 'generic/platform=iOS' \
             -archivePath $PWD/build/LaserDetector.xcarchive
+
+          # Експортуємо .ipa
           xcodebuild -exportArchive \
             -archivePath $PWD/build/LaserDetector.xcarchive \
-            -exportOptionsPlist ExportOptions.plist \
+            -exportOptionsPlist $PWD/ExportOptions.plist \
             -exportPath $PWD/build/Release-iphoneos
     artifacts:
       - build/Release-iphoneos/LaserDetector.ipa

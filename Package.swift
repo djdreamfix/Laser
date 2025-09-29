@@ -7,7 +7,7 @@ let package = Package(
         .iOS(.v15)
     ],
     products: [
-        .executable(
+        .executableTarget(
             name: "LaserDetector",
             targets: ["LaserDetector"]
         ),

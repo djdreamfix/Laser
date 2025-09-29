@@ -1,52 +1,43 @@
-name: Xcode Build and Analyze
+name: Xcode - Build and Analyze
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   build:
     runs-on: macos-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Select Xcode version
+      - name: Set up Xcode
         uses: maxim-lobanov/setup-xcode@v3
         with:
-          xcode-version: '15' # або потрібна версія
+          xcode-version: '16.4' # або інша версія, яка підтримує macOS 11+
 
-      - name: Find workspace/project
-        id: files
+      - name: Build
         run: |
+          # Задаємо схему, якщо у проекті тільки одна
+          scheme=$(xcodebuild -list -json | jq -r '.project.schemes[0]')
+          echo "Using scheme: $scheme"
+
+          # Визначаємо workspace чи project
           if ls *.xcworkspace 1> /dev/null 2>&1; then
-            echo "filetype=workspace" >> $GITHUB_OUTPUT
-            echo "file_to_build=$(ls *.xcworkspace)" >> $GITHUB_OUTPUT
-          elif ls *.xcodeproj 1> /dev/null 2>&1; then
-            echo "filetype=project" >> $GITHUB_OUTPUT
-            echo "file_to_build=$(ls *.xcodeproj)" >> $GITHUB_OUTPUT
+            filetype="workspace"
+            file=$(ls *.xcworkspace)
           else
-            echo "No Xcode workspace or project found!" >&2
-            exit 1
+            filetype="project"
+            file=$(ls *.xcodeproj)
           fi
 
-      - name: Find default scheme
-        id: scheme
-        run: |
-          default_scheme=$(xcodebuild -list -json -"$filetype" "$file_to_build" | jq -r '.project.schemes[0]')
-          if [ -z "$default_scheme" ] || [ "$default_scheme" == "null" ]; then
-            echo "No scheme found!" >&2
-            exit 1
-          fi
-          echo "scheme=$default_scheme" >> $GITHUB_OUTPUT
+          echo "Building $file ($filetype)..."
 
-      - name: Build and Analyze
-        run: |
+          # Збірка з аналізом для macOS 11+
           xcodebuild clean build analyze \
-            -"$filetype" "${{ steps.files.outputs.file_to_build }}" \
-            -scheme "${{ steps.scheme.outputs.scheme }}" \
-            -sdk iphonesimulator \
-            -destination 'platform=iOS Simulator,name=iPhone 14,OS=17.0' | xcpretty
+            -scheme "$scheme" \
+            -$filetype "$file" \
+            -destination "platform=macOS,arch=arm64" \
+            MACOSX_DEPLOYMENT_TARGET=11.0 | xcpretty

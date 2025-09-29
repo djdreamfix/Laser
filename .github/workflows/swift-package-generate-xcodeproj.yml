@@ -9,9 +9,6 @@ on:
 jobs:
   build-and-test:
     runs-on: macos-latest
-    env:
-      IOS_SDK: iphonesimulator18.5
-      DEVICE: "iPhone 15"
     
     steps:
       - name: Checkout
@@ -20,21 +17,8 @@ jobs:
       - name: Resolve Swift Packages
         run: swift package resolve
 
-      - name: Build for iOS Simulator
-        run: |
-          swift build --destination <(
-            cat <<EOF
-            {
-              "sdk": "${IOS_SDK}",
-              "arch": "arm64"
-            }
-            EOF
-          )
+      - name: Build for macOS (simulator alternative)
+        run: swift build
 
-      - name: Run Tests on iOS Simulator
-        run: |
-          SIMCTL=$(xcrun simctl list devices available | grep "${DEVICE}" | head -1 | awk -F '[()]' '{print $2}')
-          xcodebuild test \
-            -scheme LaserDetector \
-            -destination "id=${SIMCTL}" \
-            | xcpretty
+      - name: Run Tests
+        run: swift test

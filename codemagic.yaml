@@ -1,29 +1,53 @@
 workflows:
   ios-laser-detector:
-    name: LaserDetector iOS
+    name: LaserDetector
     max_build_duration: 60
     environment:
       vars:
-        FLUTTER_BUILD_MODE: "release" # можна прибрати, якщо чистий SwiftUI
+        FLUTTER_BUILD_MODE: "release"
+        TEAM_ID: "2V35PTV87G"   # <-- Встав свій Team ID тут
     scripts:
       - name: Install dependencies
         script: echo "No dependencies needed for pure SwiftUI project"
+
+      - name: Create ExportOptions.plist
+        script: |
+          cat > ExportOptions.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store</string>
+              <key>teamID</key>
+              <string>${TEAM_ID}</string>
+              <key>signingStyle</key>
+              <string>manual</string>
+              <key>compileBitcode</key>
+              <true/>
+          </dict>
+          </plist>
+          EOF
+
       - name: Build and archive iOS app
         script: |
-          # Архівуємо додаток
           xcodebuild clean archive \
             -scheme LaserDetector \
             -sdk iphoneos \
             -configuration Release \
-            -archivePath $PWD/build/LaserDetector.xcarchive
+            -archivePath build/LaserDetector.xcarchive \
+            -destination "generic/platform=iOS"
 
-          # Експортуємо .ipa
+      - name: Export .ipa
+        script: |
           xcodebuild -exportArchive \
-            -archivePath $PWD/build/LaserDetector.xcarchive \
-            -exportOptionsPlist $PWD/ExportOptions.plist \
-            -exportPath $PWD/build/Release-iphoneos
+            -archivePath build/LaserDetector.xcarchive \
+            -exportPath build/ipa \
+            -exportOptionsPlist ExportOptions.plist
+
     artifacts:
-      - build/Release-iphoneos/LaserDetector.ipa
+      - build/ipa/LaserDetector.ipa
+
     publishing:
       email:
         recipients:

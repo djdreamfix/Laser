@@ -13,18 +13,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Xcode
-        uses: maxim-lobanov/setup-xcode@v3
-        with:
-          xcode-version: '16.4' # або інша версія, яка підтримує macOS 11+
-
       - name: Build
         run: |
-          # Задаємо схему, якщо у проекті тільки одна
           scheme=$(xcodebuild -list -json | jq -r '.project.schemes[0]')
           echo "Using scheme: $scheme"
 
-          # Визначаємо workspace чи project
           if ls *.xcworkspace 1> /dev/null 2>&1; then
             filetype="workspace"
             file=$(ls *.xcworkspace)
@@ -35,7 +28,6 @@ jobs:
 
           echo "Building $file ($filetype)..."
 
-          # Збірка з аналізом для macOS 11+
           xcodebuild clean build analyze \
             -scheme "$scheme" \
             -$filetype "$file" \

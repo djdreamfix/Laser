@@ -9,7 +9,17 @@ workflows:
       - name: Install dependencies
         script: echo "No dependencies needed for pure SwiftUI project"
       - name: Build iOS app
-        script: xcodebuild -scheme LaserDetector -sdk iphoneos -configuration Release clean build
+        script: |
+          xcodebuild clean archive \
+            -scheme LaserDetector \
+            -sdk iphoneos \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath $PWD/build/LaserDetector.xcarchive
+          xcodebuild -exportArchive \
+            -archivePath $PWD/build/LaserDetector.xcarchive \
+            -exportOptionsPlist ExportOptions.plist \
+            -exportPath $PWD/build/Release-iphoneos
     artifacts:
       - build/Release-iphoneos/LaserDetector.ipa
     publishing:

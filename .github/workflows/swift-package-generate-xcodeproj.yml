@@ -1,0 +1,36 @@
+name: Build and Analyze Swift Package
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate Xcode project from Swift Package
+        run: |
+          swift package generate-xcodeproj
+          ls -la
+
+      - name: Set scheme and file
+        run: |
+          # Вибираємо перший scheme
+          scheme=$(xcodebuild -list -json | jq -r '.project.schemes[0]')
+          echo "Using scheme: $scheme"
+
+          # Якщо workspace існує, використовуємо його, інакше project
+          if ls *.xcworkspace 1> /dev/null 2>&1; then
+            filetype="workspace"
+            file=$(ls *.xcworkspace | head -n1)
+          else
+            filetype="project"
+            file=$(ls *.xcodeproj | head -n1)
+          fi
+          echo "Using $filetype: $file"

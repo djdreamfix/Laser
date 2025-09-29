@@ -1,36 +1,40 @@
-name: Build and Analyze Swift Package
+name: SwiftUI iOS CI
 
 on:
   push:
-    branches: ["main"]
+    branches: [main]
   pull_request:
-    branches: ["main"]
+    branches: [main]
 
 jobs:
-  build:
+  build-and-test:
     runs-on: macos-latest
-
+    env:
+      IOS_SDK: iphonesimulator18.5
+      DEVICE: "iPhone 15"
+    
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Generate Xcode project from Swift Package
-        run: |
-          swift package generate-xcodeproj
-          ls -la
+      - name: Resolve Swift Packages
+        run: swift package resolve
 
-      - name: Set scheme and file
+      - name: Build for iOS Simulator
         run: |
-          # Вибираємо перший scheme
-          scheme=$(xcodebuild -list -json | jq -r '.project.schemes[0]')
-          echo "Using scheme: $scheme"
+          swift build --destination <(
+            cat <<EOF
+            {
+              "sdk": "${IOS_SDK}",
+              "arch": "arm64"
+            }
+            EOF
+          )
 
-          # Якщо workspace існує, використовуємо його, інакше project
-          if ls *.xcworkspace 1> /dev/null 2>&1; then
-            filetype="workspace"
-            file=$(ls *.xcworkspace | head -n1)
-          else
-            filetype="project"
-            file=$(ls *.xcodeproj | head -n1)
-          fi
-          echo "Using $filetype: $file"
+      - name: Run Tests on iOS Simulator
+        run: |
+          SIMCTL=$(xcrun simctl list devices available | grep "${DEVICE}" | head -1 | awk -F '[()]' '{print $2}')
+          xcodebuild test \
+            -scheme LaserDetector \
+            -destination "id=${SIMCTL}" \
+            | xcpretty
